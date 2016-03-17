@@ -95,10 +95,13 @@ class Ball
     }
     public void goToPosition(float posY, float posX, float posR)
     {
-        if((6.67 *0.1*this.r*posR)/(posX-this.x) < 20 && (6.67 *0.1*this.r*posR)/(posX-this.x) > -20)
-        {	this.velX += (6.67 *0.0001 *this.r*posR)/(posX-this.x);}
-        if((6.67 *0.1*this.r*posR)/(posY-this.y) < 20 && (6.67 *0.1*this.r*posR)/(posY-this.y) > -20)
-        {	this.velY += (6.67 *0.0001*this.r*posR)/(posY-this.y);}
+        double angleRadians = Math.atan2(posY - this.y, posX - this.x);
+        double distance = Math.sqrt(Math.pow((posY - this.y),2) + Math.pow((posX - this.x),2));
+        if((6.67 *0.1*this.r*posR)/(distance) < 20 && (6.67 *0.1*this.r*posR)/(distance) > -20)
+        {
+            this.velX = Float.parseFloat(String.valueOf((6.67 *0.1*this.r*posR)/(Float.parseFloat(String.valueOf(distance))) * Math.cos(angleRadians)));
+            this.velY = Float.parseFloat(String.valueOf((6.67 *0.1*this.r*posR)/(Float.parseFloat(String.valueOf(distance))) * Math.sin(angleRadians)));
+        }
         if(posR < this.r)
         {
             this.setY(this.y+this.velY);
