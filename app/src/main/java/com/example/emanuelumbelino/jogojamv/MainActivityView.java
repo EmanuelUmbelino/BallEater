@@ -10,6 +10,8 @@ import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
+import java.util.Random;
+
 /**
  * Created by Emanuel.Umbelino on 15/03/2016.
  */
@@ -20,14 +22,13 @@ public class MainActivityView extends View implements Runnable
     private Handler handler;
     private int screenWidth;
     private int screenHeight;
-    private String[] enemiesTypes = new String[2];
+    private String[] enemiesTypes = new String[4];
     private Ball player = new Ball(0,0,2,"Player", screenWidth, screenHeight);
-    private Ball[] enemy = new Ball[10];
+    private Ball[] enemy = new Ball[15];
     private int wait = 0;
     private int go = 0;
     Paint paint = new Paint();
 
-    private final float TOUCH_SCALE_FACTOR = 180.0f / 320;
     private float mPreviousX;
     private float mPreviousY;
 
@@ -40,7 +41,10 @@ public class MainActivityView extends View implements Runnable
         screenWidth = c.getResources().getDisplayMetrics().widthPixels;
 
         enemiesTypes[0] = "Basic";
-        enemiesTypes[1] = "Pusher";
+        enemiesTypes[1] = "Basic";
+        enemiesTypes[2] = "Shoot";
+        enemiesTypes[3] = "Shoot";
+        enemiesTypes[3] = "Explosion";
 
         player= new Ball(screenWidth/2,screenHeight/2,15,"Player", screenWidth, screenHeight);
         handler = new Handler();
@@ -54,22 +58,22 @@ public class MainActivityView extends View implements Runnable
         else if (go < enemy.length)
         {
             wait = 0;
-            enemy[go] = new Ball(screenWidth*2 * Math.random()-screenWidth,
-                    screenHeight*2 * Math.random()-screenWidth,
-                    20 * Math.random()+ 10,"Basic", screenWidth, screenHeight);
+            enemy[go] = new Ball(screenWidth * Math.random(),
+                    screenHeight * Math.random(),
+                    7 * Math.random()+ player.getR(),enemiesTypes[new Random().nextInt(enemiesTypes.length)], screenWidth, screenHeight);
             go++;
         }
         for(int i = 0; i < go; i++)
         {
             enemy[i].goToPosition(player.getY(), player.getX(), player.getR());
-            for(int f = 0; f < go; f++)
+            /*for(int f = 0; f < go; f++)
             {
                 if(i!=f)
                 {
                     enemy[i].goToPosition(enemy[f].getY(),enemy[f].getX(),enemy[f].getR());
                     enemy[i].eat(enemy[f].getY(),enemy[f].getX(),enemy[f].getR(),enemy[f]);
                 }
-            }
+            }*/
         }
         if(player.inMove)
             player.goToPosition(mPreviousY, mPreviousX, 0);
@@ -97,13 +101,14 @@ public class MainActivityView extends View implements Runnable
     {
         super.onDraw(canvas);
 
-        paint.setColor(Color.BLACK);
         paint.setStyle(Paint.Style.FILL);
 
+        paint.setColor(player.myColor);
         canvas.drawCircle(player.getX() , player.getY(), player.getR(), paint);
 
         for(int i = 0; i < go; i++)
         {
+            paint.setColor(enemy[i].myColor);
             canvas.drawCircle(enemy[i].getX(), enemy[i].getY(), enemy[i].getR(), paint);
         }
     }
@@ -123,6 +128,7 @@ class Ball
     private double x, y, r, velX, velY;
     private String type;
     private int height, width;
+    public int myColor = Color.BLACK;
     public boolean inMove;
 
     public Ball(double posX, double posY, double ray, String myType, int widthT, int heightT)
@@ -134,6 +140,12 @@ class Ball
         height = heightT;
         width = widthT;
         inMove = false;
+        if(type.equals("Player"))
+            myColor = Color.BLUE;
+        else if(type.equals("Explosion"))
+            myColor = Color.RED;
+        else if(type.equals("Shoot"))
+            myColor = Color.YELLOW;
     }
     public void goToPosition(float posY, float posX, float posR)
     {
@@ -151,6 +163,28 @@ class Ball
                 inMove = false;
 
         }
+        else if(type.equals("Explosion"))
+            if(!inMove)
+            {
+                inMove = true;
+                velX = distance/30 * Math.cos(angleRadians);
+                velY = distance/30 * Math.sin(angleRadians);
+            }
+            this.setX(this.x + this.velX);
+            this.setY(this.y + this.velY);
+        }
+        else if(type.equals("Shoot"))
+        {
+            if(!inMove || this.y+this.velY - r < 0 || this.y+this.velY - r > height ||
+                this.x+this.velX - r < 0 || this.x+this.velX - r > width)
+            {
+                inMove = true;
+                velX = distance/30 * Math.cos(angleRadians);
+                velY = distance/30 * Math.sin(angleRadians);
+            }
+            this.setX(this.x + this.velX);
+            this.setY(this.y + this.velY);
+        }
         else
         {
             if((6.67 *0.05*this.r*posR)/ distance < 200/r && (6.67 *0.05*this.r*posR)/ distance > -200/r)
@@ -161,16 +195,16 @@ class Ball
 
             if(posR < this.r)
             {
-                if(this.y+this.velY - r > -height && this.y+this.velY - r < height*2)
+                if(this.y+this.velY - r > 0 && this.y+this.velY - r < height)
                     this.setY(this.y+this.velY);
-                if(this.x+this.velX - r> -width && this.x+this.velX - r < width*2)
+                if(this.x+this.velX - r> 0 && this.x+this.velX - r < width)
                     this.setX(this.x + this.velX);
             }
             else if (posR > this.r)
             {
-                if(this.y-this.velY - r > -height && this.y-this.velY + r < height*2)
+                if(this.y-this.velY - r > 0 && this.y-this.velY + r < height)
                     this.setY(this.y-this.velY);
-                if(this.x-this.velX - r > -width && this.x-this.velX + r < width*2)
+                if(this.x-this.velX - r > 0 && this.x-this.velX + r < width)
                     this.setX(this.x - this.velX);
             }
         }
