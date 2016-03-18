@@ -10,8 +10,6 @@ import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
-import java.util.Random;
-
 /**
  * Created by Emanuel.Umbelino on 15/03/2016.
  */
@@ -20,105 +18,178 @@ public class MainActivityView extends View implements Runnable
 {
     Context context;
     private Handler handler;
-    private String[] types = new String[3];
-    private Random rand = new Random();
-    private Ball enemy;
-    private Ball player;
+    private int screenWidth;
+    private int screenHeight;
+    private String[] enemiesTypes = new String[2];
+    private Ball player = new Ball(0,0,2,"Player", screenWidth, screenHeight);
+    private Ball[] enemy = new Ball[10];
+    private int wait = 0;
+    private int go = 0;
+    Paint paint = new Paint();
+
+    private final float TOUCH_SCALE_FACTOR = 180.0f / 320;
+    private float mPreviousX;
+    private float mPreviousY;
 
     public MainActivityView(Context c)
     {
         super (c);
         context = c;
 
-        types[0] = "Player";
-        types[1] = "Basic";
-        types[2] = "Pusher";
-        enemy = new Ball(rand.nextInt(100),rand.nextInt(100), 10, types[1]);
-        player = new Ball(0,0, 10, types[0]);
+        screenHeight = c.getResources().getDisplayMetrics().heightPixels - 125;
+        screenWidth = c.getResources().getDisplayMetrics().widthPixels;
 
+        enemiesTypes[0] = "Basic";
+        enemiesTypes[1] = "Pusher";
+
+        player= new Ball(screenWidth/2,screenHeight/2,15,"Player", screenWidth, screenHeight);
         handler = new Handler();
-    }
-
-    public boolean onTouchEvent(MotionEvent event) {
-        int x = (int)event.getX();
-        int y = (int)event.getY();
-        switch (event.getAction()) {
-            case MotionEvent.ACTION_DOWN:
-            case MotionEvent.ACTION_MOVE:
-            case MotionEvent.ACTION_UP:
-        }
-        return false;
+        handler.post(this);
     }
 
     private void Update()
     {
-        enemy.goToPosition(player.getX(), player.getY(), player.getR());
+        if (wait < 30)
+            wait ++;
+        else if (go < enemy.length)
+        {
+            wait = 0;
+            enemy[go] = new Ball(screenWidth*2 * Math.random()-screenWidth,
+                    screenHeight*2 * Math.random()-screenWidth,
+                    20 * Math.random()+ 10,"Basic", screenWidth, screenHeight);
+            go++;
+        }
+        for(int i = 0; i < go; i++)
+        {
+            enemy[i].goToPosition(player.getY(), player.getX(), player.getR());
+            for(int f = 0; f < go; f++)
+            {
+                if(i!=f)
+                {
+                    enemy[i].goToPosition(enemy[f].getY(),enemy[f].getX(),enemy[f].getR());
+                    enemy[i].eat(enemy[f].getY(),enemy[f].getX(),enemy[f].getR(),enemy[f]);
+                }
+            }
+        }
+        if(player.inMove)
+            player.goToPosition(mPreviousY, mPreviousX, 0);
+    }
+    @Override
+    public boolean onTouchEvent(MotionEvent e) {
+
+        float x = e.getX();
+        float y = e.getY();
+
+        switch (e.getAction()) {
+            case MotionEvent.ACTION_MOVE:
+
+                float dx = x - mPreviousX;
+                float dy = y - mPreviousY;
+
+        }
+        player.goToPosition(y, x, 0);
+        mPreviousX = x;
+        mPreviousY = y;
+        return true;
+    }
+    @Override
+    protected void onDraw(Canvas canvas)
+    {
+        super.onDraw(canvas);
+
+        paint.setColor(Color.BLACK);
+        paint.setStyle(Paint.Style.FILL);
+
+        canvas.drawCircle(player.getX() , player.getY(), player.getR(), paint);
+
+        for(int i = 0; i < go; i++)
+        {
+            canvas.drawCircle(enemy[i].getX(), enemy[i].getY(), enemy[i].getR(), paint);
+        }
     }
 
     @Override
     public void run()
     {
         handler.postDelayed(this, 30);
+
         Update();
         invalidate();
     }
-
-    @Override
-    protected void onDraw(Canvas canvas)
-    {
-        super.onDraw(canvas);
-
-        Paint paint = new Paint();
-        paint.setColor(Color.BLACK);
-        paint.setStyle(Paint.Style.FILL);
-
-        player.setX(canvas.getWidth() / 2);player.setY(canvas.getWidth() / 2);
-        canvas.drawCircle(player.getX(), player.getY(), player.getR(), paint);
-
-        canvas.drawCircle(enemy.getX(), enemy.getY(), enemy.getR(), paint);
-    }
-
 }
 
 class Ball
 {
-    private float x, y, r, velX, velY;
+    private double x, y, r, velX, velY;
     private String type;
+    private int height, width;
+    public boolean inMove;
 
-    public Ball(int posX, int posY, int ray, String myType)
+    public Ball(double posX, double posY, double ray, String myType, int widthT, int heightT)
     {
         x = posX;
         y = posY;
-        r = ray;
         type = myType;
-
+        r = ray;
+        height = heightT;
+        width = widthT;
+        inMove = false;
     }
     public void goToPosition(float posY, float posX, float posR)
     {
         double angleRadians = Math.atan2(posY - this.y, posX - this.x);
-        double distance = Math.sqrt(Math.pow((posY - this.y),2) + Math.pow((posX - this.x),2));
-        if((6.67 *0.1*this.r*posR)/(distance) < 20 && (6.67 *0.1*this.r*posR)/(distance) > -20)
+        double distance = Math.sqrt(Math.pow((posY - this.y), 2) + Math.pow((posX - this.x), 2));
+        if(type.equals("Player"))
         {
-            this.velX = Float.parseFloat(String.valueOf((6.67 *0.1*this.r*posR)/(Float.parseFloat(String.valueOf(distance))) * Math.cos(angleRadians)));
-            this.velY = Float.parseFloat(String.valueOf((6.67 *0.1*this.r*posR)/(Float.parseFloat(String.valueOf(distance))) * Math.sin(angleRadians)));
-        }
-        if(posR < this.r)
-        {
-            this.setY(this.y+this.velY);
-            this.setX(this.x+this.velX);
+            velX = distance/10 * Math.cos(angleRadians);
+            velY = distance/10 * Math.sin(angleRadians);
+            this.setX(this.x + this.velX);
+            this.setY(this.y + this.velY);
+            if(this.x != posX || this.y != posY)
+                inMove = true;
+            else
+                inMove = false;
+
         }
         else
         {
-            this.setY(this.y-this.velY);
-            this.setX(this.x-this.velX);
+            if((6.67 *0.05*this.r*posR)/ distance < 200/r && (6.67 *0.05*this.r*posR)/ distance > -200/r)
+            {
+                velX = (6.67 *0.05*this.r * posR) / distance * Math.cos(angleRadians);
+                velY = (6.67 *0.05*this.r * posR) / distance * Math.sin(angleRadians);
+            }
+
+            if(posR < this.r)
+            {
+                if(this.y+this.velY - r > -height && this.y+this.velY - r < height*2)
+                    this.setY(this.y+this.velY);
+                if(this.x+this.velX - r> -width && this.x+this.velX - r < width*2)
+                    this.setX(this.x + this.velX);
+            }
+            else if (posR > this.r)
+            {
+                if(this.y-this.velY - r > -height && this.y-this.velY + r < height*2)
+                    this.setY(this.y-this.velY);
+                if(this.x-this.velX - r > -width && this.x-this.velX + r < width*2)
+                    this.setX(this.x - this.velX);
+            }
+        }
+    }
+    public void eat(float posY, float posX, float posR, Ball enemy)
+    {
+        double distance = Math.sqrt(Math.pow((posY - this.y),2) + Math.pow((posX - this.x),2));
+        if(distance < this.r && posR < this.r)
+        {
+            this.r += posR/2;
+            enemy.r = 0;
         }
     }
 
-    public float getX() {return x;}
-    public void setX(float x) {this.x = x;}
-    public float getY() {return y;}
-    public void setY(float y) {this.y = y;}
+    public float getX() {return Float.parseFloat(String.valueOf(x));}
+    public void setX(double x) {this.x = x;}
+    public float getY() {return Float.parseFloat(String.valueOf(y));}
+    public void setY(double y) {this.y = y;}
     public float getR() {
-        return r;
+        return Float.parseFloat(String.valueOf(r));
     }
 }
