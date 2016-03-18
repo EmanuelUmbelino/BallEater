@@ -164,6 +164,7 @@ class Ball
 
         }
         else if(type.equals("Explosion"))
+        {
             if(!inMove)
             {
                 inMove = true;
