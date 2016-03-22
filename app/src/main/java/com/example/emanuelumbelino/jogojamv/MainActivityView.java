@@ -4,7 +4,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.Rect;
+import android.os.Debug;
 import android.os.Handler;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -12,9 +12,6 @@ import android.view.View;
 
 import java.util.Random;
 
-/**
- * Created by Emanuel.Umbelino on 15/03/2016.
- */
 
 public class MainActivityView extends View implements Runnable
 {
@@ -43,7 +40,6 @@ public class MainActivityView extends View implements Runnable
         enemiesTypes[0] = "Basic";
         enemiesTypes[1] = "Basic";
         enemiesTypes[2] = "Shoot";
-        enemiesTypes[3] = "Shoot";
         enemiesTypes[3] = "Explosion";
 
         player= new Ball(screenWidth/2,screenHeight/2,15,"Player", screenWidth, screenHeight);
@@ -51,7 +47,7 @@ public class MainActivityView extends View implements Runnable
         handler.post(this);
     }
 
-    private void Update()
+    private void update()
     {
         if (wait < 30)
             wait ++;
@@ -65,6 +61,7 @@ public class MainActivityView extends View implements Runnable
         }
         for(int i = 0; i < go; i++)
         {
+            enemy[i].update();
             enemy[i].goToPosition(player.getY(), player.getX(), player.getR());
             /*for(int f = 0; f < go; f++)
             {
@@ -101,15 +98,12 @@ public class MainActivityView extends View implements Runnable
     {
         super.onDraw(canvas);
 
-        paint.setStyle(Paint.Style.FILL);
-
         paint.setColor(player.myColor);
-        canvas.drawCircle(player.getX() , player.getY(), player.getR(), paint);
+        player.draw(canvas,paint);
 
         for(int i = 0; i < go; i++)
         {
-            paint.setColor(enemy[i].myColor);
-            canvas.drawCircle(enemy[i].getX(), enemy[i].getY(), enemy[i].getR(), paint);
+            enemy[i].draw(canvas,paint);
         }
     }
 
@@ -118,7 +112,7 @@ public class MainActivityView extends View implements Runnable
     {
         handler.postDelayed(this, 30);
 
-        Update();
+        update();
         invalidate();
     }
 }
@@ -127,9 +121,12 @@ class Ball
 {
     private double x, y, r, velX, velY;
     private String type;
-    private int height, width;
+    private int diference;
+    private int heightScreen, widthScreen;
     public int myColor = Color.BLACK;
     public boolean inMove;
+    private boolean die;
+    private Ball[] particles;
 
     public Ball(double posX, double posY, double ray, String myType, int widthT, int heightT)
     {
@@ -137,9 +134,11 @@ class Ball
         y = posY;
         type = myType;
         r = ray;
-        height = heightT;
-        width = widthT;
+        heightScreen = heightT;
+        widthScreen = widthT;
         inMove = false;
+        die = false;
+        particles = new Ball[5];
         if(type.equals("Player"))
             myColor = Color.BLUE;
         else if(type.equals("Explosion"))
@@ -147,69 +146,150 @@ class Ball
         else if(type.equals("Shoot"))
             myColor = Color.YELLOW;
     }
+
+    void defaultMovement(double distance, double angleRadians, float posR)
+    {
+        if((6.67 *0.05*this.r*posR)/ distance < 200/r && (6.67 *0.05*this.r*posR)/ distance > -200/r)
+        {
+            velX = (6.67 *0.05*this.r * posR) / distance * Math.cos(angleRadians);
+            velY = (6.67 *0.05*this.r * posR) / distance * Math.sin(angleRadians);
+        }
+
+        if(posR < this.r)
+        {
+            if(this.y+this.velY - r > 0 && this.y+this.velY - r < heightScreen)
+                this.setY(this.y+this.velY);
+            if(this.x+this.velX - r> 0 && this.x+this.velX - r < widthScreen)
+                this.setX(this.x + this.velX);
+        }
+        else if (posR > this.r)
+        {
+            if(this.y-this.velY - r > 0 && this.y-this.velY + r < heightScreen)
+                this.setY(this.y-this.velY);
+            if(this.x-this.velX - r > 0 && this.x-this.velX + r < widthScreen)
+                this.setX(this.x - this.velX);
+        }
+    }
+
+    void playerMovement(double distance, double angleRadians, float posX, float posY)
+    {
+        velX = distance/10 * Math.cos(angleRadians);
+        velY = distance/10 * Math.sin(angleRadians);
+        this.setX(this.x + this.velX);
+        this.setY(this.y + this.velY);
+        if(this.x != posX || this.y != posY)
+            inMove = true;
+        else
+            inMove = false;
+    }
+
+    void explosionMovement(double angleRadians)
+    {
+        if(!inMove)
+        {
+            inMove = true;
+            velX = 10 * Math.cos(angleRadians);
+            velY = 10 * Math.sin(angleRadians);
+        }
+        this.setX(this.x + this.velX);
+        this.setY(this.y + this.velY);
+        if(this.y+this.velY - r < 0 || this.y+this.velY + r > heightScreen ||
+                this.x+this.velX - r < 0 || this.x+this.velX + r > widthScreen)
+        {
+            if(this.y+this.velY - r < 0)
+                diference = 90;
+            else if (this.y+this.velY + r > heightScreen)
+                diference = 0;
+            else if (this.x+this.velX - r < 0)
+                diference = 180;
+            else if (this.x+this.velX + r > widthScreen)
+                diference = 270;
+            if(r > 1)
+            {
+                for (int i = 0; i < particles.length; i++) {
+                    particles[i] = new Ball(x, y, r / 2, type, widthScreen, heightScreen);
+                }
+            }
+            velX = 0;
+            velY = 0;
+            r = 0;
+            die = true;
+        }
+    }
+
+    void shootMovement(double distance, double angleRadians)
+    {
+        if(!inMove || this.y+this.velY - r < 0 || this.y+this.velY + r > heightScreen ||
+                this.x+this.velX - r < 0 || this.x+this.velX + r > widthScreen)
+        {
+            inMove = true;
+            velX = distance/30 * Math.cos(angleRadians);
+            velY = distance/30 * Math.sin(angleRadians);
+        }
+        this.setX(this.x + this.velX);
+        this.setY(this.y + this.velY);
+    }
+
     public void goToPosition(float posY, float posX, float posR)
     {
-        double angleRadians = Math.atan2(posY - this.y, posX - this.x);
-        double distance = Math.sqrt(Math.pow((posY - this.y), 2) + Math.pow((posX - this.x), 2));
-        if(type.equals("Player"))
+        if(!die)
         {
-            velX = distance/10 * Math.cos(angleRadians);
-            velY = distance/10 * Math.sin(angleRadians);
-            this.setX(this.x + this.velX);
-            this.setY(this.y + this.velY);
-            if(this.x != posX || this.y != posY)
-                inMove = true;
-            else
-                inMove = false;
-
-        }
-        else if(type.equals("Explosion"))
-        {
-            if(!inMove)
+            double angleRadians = Math.atan2(posY - this.y, posX - this.x);
+            switch (type)
             {
-                inMove = true;
-                velX = distance/30 * Math.cos(angleRadians);
-                velY = distance/30 * Math.sin(angleRadians);
-            }
-            this.setX(this.x + this.velX);
-            this.setY(this.y + this.velY);
-        }
-        else if(type.equals("Shoot"))
-        {
-            if(!inMove || this.y+this.velY - r < 0 || this.y+this.velY - r > height ||
-                this.x+this.velX - r < 0 || this.x+this.velX - r > width)
-            {
-                inMove = true;
-                velX = distance/30 * Math.cos(angleRadians);
-                velY = distance/30 * Math.sin(angleRadians);
-            }
-            this.setX(this.x + this.velX);
-            this.setY(this.y + this.velY);
-        }
-        else
-        {
-            if((6.67 *0.05*this.r*posR)/ distance < 200/r && (6.67 *0.05*this.r*posR)/ distance > -200/r)
-            {
-                velX = (6.67 *0.05*this.r * posR) / distance * Math.cos(angleRadians);
-                velY = (6.67 *0.05*this.r * posR) / distance * Math.sin(angleRadians);
-            }
-
-            if(posR < this.r)
-            {
-                if(this.y+this.velY - r > 0 && this.y+this.velY - r < height)
-                    this.setY(this.y+this.velY);
-                if(this.x+this.velX - r> 0 && this.x+this.velX - r < width)
-                    this.setX(this.x + this.velX);
-            }
-            else if (posR > this.r)
-            {
-                if(this.y-this.velY - r > 0 && this.y-this.velY + r < height)
-                    this.setY(this.y-this.velY);
-                if(this.x-this.velX - r > 0 && this.x-this.velX + r < width)
-                    this.setX(this.x - this.velX);
+                case "Player":
+                {
+                    double distance = Math.sqrt(Math.pow((posY - this.y), 2) + Math.pow((posX - this.x), 2));
+                    playerMovement(distance, angleRadians, posX, posY);
+                }
+                break;
+                case "Shoot":
+                {
+                    double distance = Math.sqrt(Math.pow((posY - this.y), 2) + Math.pow((posX - this.x), 2));
+                    shootMovement(distance, angleRadians);
+                }
+                break;
+                case "Explosion":
+                {
+                    explosionMovement(angleRadians);
+                }
+                break;
+                default:
+                {
+                    double distance = Math.sqrt(Math.pow((posY - this.y), 2) + Math.pow((posX - this.x), 2));
+                    defaultMovement(distance, angleRadians, posR);
+                }
             }
         }
     }
+    public void update()
+    {
+        if(type.equals("Explosion") && die)
+        {
+            for(int i = 0, angle = diference; i < particles.length; i++, angle += 45)
+            {
+                float particleX = 1000 * Float.parseFloat(String.valueOf(Math.cos(angle)));
+                float particleY = 1000 * Float.parseFloat(String.valueOf(Math.sin(angle)));
+                particles[i].goToPosition(particleY, particleX, 0);
+            }
+
+        }
+    }
+    public void draw(Canvas canvas, Paint paint)
+    {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(myColor);
+
+        canvas.drawCircle(getX(), getY(), getR(), paint);
+        if (type.equals("Explosion") && die)
+        {
+            for (int i = 0; i < particles.length; i++)
+            {
+                particles[i].draw(canvas,paint);
+            }
+        }
+    }
+
     public void eat(float posY, float posX, float posR, Ball enemy)
     {
         double distance = Math.sqrt(Math.pow((posY - this.y),2) + Math.pow((posX - this.x),2));
